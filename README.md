@@ -1,6 +1,6 @@
 # Metronome
 
-An electronic metronome powered by an ESP32-S3, utilising a 160 x 128 LCD-TFT screen and a speaker
+An electronic metronome powered by an ESP32-S3-WROOM Module, utilising a 160 x 128 LCD-TFT screen and a speaker
 
 ## Motivation
 
@@ -87,3 +87,7 @@ You may refer to `3d/pcb3d.step` but note that there will not be any silkscreen 
 Refer to `3d/metronomecase.step` or `3d/metronomecase.f3d` if you use Autodesk Fusion
 
 ## Project Zine
+
+![Zine](zine.png)
+
+Uncompressed version at `zine.pdf`
