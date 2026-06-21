@@ -10,6 +10,7 @@
 #include <Audio.h>
 #include "display.ino"
 #include "speaker.ino"
+#include "config.h"
 
 /*
 from example code
@@ -29,40 +30,7 @@ VCC                    any microcontroler output pin - but set also ROTARY_ENCOD
 
 */
 
-#define TEMPO_A_PIN 4
-#define TEMPO_B_PIN 5
-#define TEMPO_BUTTON_PIN 1
 
-#define TIMESIG_A_PIN 14
-#define TIMESIG_B_PIN 15
-#define TIMESIG_BUTTON_PIN 2
-
-#define VOLUME_A_PIN 17
-#define VOLUME_A_PIN 18
-#define VOLUME_BUTTON_PIN 10
-
-#define TFT_CS 38
-#define TFT_DC 39
-#define TFT_RST 40
-#define TFT_SDA 41
-#define TFT_CLK 42
-
-#define PAUSEPLAY 6
-
-#define SPEAKER_DOUT 7  //DIN on MAX39857A
-#define SPEAKER_BCLK 8
-#define SPEAKER_LRCLK 9
-
-#define SAMPLE_RATE 44100
-#define I2S_NUM I2S_NUM_0
-
-#define FREQ 440 //tock frequency
-
-RotaryEncoder re_tempo(TEMPO_A_PIN, TEMPO_B_PIN, TEMPO_BUTTON_PIN);
-RotaryEncoder re_timesig(TIMESIG_A_PIN, TIMESIG_B_PIN, TIMESIG_BUTTON_PIN);
-RotaryEncoder re_volume(VOLUME_A_PIN, VOLUME_B_PIN, VOLUME_BUTTON_PIN);
-
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 int tempo = 60;
 int timesigsel = 0;
@@ -73,80 +41,59 @@ struct timesig {
 	int lower;
 };
 
-struct timesigs arr[4] = {{1,4}, {2,4}, {3,4}, {4,4}};
+const timesig SIGS arr[4] = {{1,4}, {2,4}, {3,4}, {4,4}};
+const uint8_t SIG_COUNT = sizeof(SIGS) / sizeof(SIGS[0]);
 
+RotaryEncoder re_tempo(TEMPO_A_PIN, TEMPO_B_PIN, TEMPO_BUTTON_PIN);
+RotaryEncoder re_timesig(TIMESIG_A_PIN, TIMESIG_B_PIN, TIMESIG_BUTTON_PIN);
+RotaryEncoder re_volume(VOLUME_A_PIN, VOLUME_B_PIN, VOLUME_BUTTON_PIN);
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+static void handlePlayPause(){
+	play = digitalRead(PAUSEPLAY);
+}
 
 void storetempovalue(long value) {
 	tempo = value;
+	g_uiDirty = true;
 }
 
 void storetimesigvalue(long value) {
 	timesigsel = value;
+	g_uiDirty = true;
 }
 
 void storevolumevalue(long value) {
 	timesig = value;
+	g_uiDirty = true;
 }
 
-void setup_re_tempo() {
-	re_tempo.setBoundaries(10, 200, false);
+void setupRotaryEncoders(){
+	re_tempo.setBoundaries(30, 180, false);          // 30..250 BPM, no wrap
+  re_tempo.onTurned(&storetempovalue);
+  re_tempo.setEncoderValue(g_tempo);
+  re_tempo.begin();
 
-	// The function specified here will be called every time the knob is turned
-	// and the current value will be passed to it
-	re_tempo.onTurned(&storetempoValue);
+  re_timesig.setBoundaries(0, SIG_COUNT - 1, true); // wrap around the list
+  re_timesig.onTurned(&storetimesigvalue));
+  re_timesig.setEncoderValue(g_sigIndex);
+  re_timesig.begin();
 
-	// The function specified here will be called every time the button is pushed and
-	// the duration (in milliseconds) that the button was down will be passed to it
-	//re_tempo.onPressed( &button1ToggleRE2 );
-
-	re_tempo.setEncoderValue(60);
-
-	// This is where the inputs are configured and the interrupts get attached
-	re_tempo.begin();
-}
-
-void setup_re_timesig() {
-	re_tempo.setBoundaries(0, 3, false);  //temp as of now considering 1/4, 2/4, 3/4, 4/4 only
-
-	// The function specified here will be called every time the knob is turned
-	// and the current value will be passed to it
-	re_tempo.onTurned(&storetimesigValue);
-
-	// The function specified here will be called every time the button is pushed and
-	// the duration (in milliseconds) that the button was down will be passed to it
-	//re_tempo.onPressed( &button1ToggleRE2 );
-
-	re_tempo.setEncoderValue(3);
-
-	// This is where the inputs are configured and the interrupts get attached
-	re_tempo.begin();
-}
-
-void setup_re_volume() {
-	re_tempo.setBoundaries(0, 2, true);  //temp as of now only considering quaver, crochet, minim only
-
-	// The function specified here will be called every time the knob is turned
-	// and the current value will be passed to it
-	re_tempo.onTurned(&storevolumeValue);
-
-	// The function specified here will be called every time the button is pushed and
-	// the duration (in milliseconds) that the button was down will be passed to it
-	//re_tempo.onPressed( &button1ToggleRE2 );
-
-	re_tempo.setEncoderValue(60);
-
-	// This is where the inputs are configured and the interrupts get attached
-	re_tempo.begin();
+  re_volume.setBoundaries(0, 10, false);            // 0..10
+  re_volume.onTurned(&storevolumevalue);
+  re_volume.setEncoderValue(g_volume);
+  re_volume.begin();
 }
 
 void setup() {
 	// put your setup code here, to run once:
-	Serial.begin(9600);
+	Serial.begin(115200);
 
-	setup_re_tempo();
-	setup_re_timesig();
-	setup_re_volume();
-	volatile bool pause = true;
+	setupRotaryEncoders();
+	setupDisplay();
+	setupSpeaker();
+	volatile bool play = true;
 	tft.initR(INITR_GREENTAB);
 
 	// Setup I2S
@@ -166,5 +113,38 @@ void loop() {
 	// put your main code here, to run repeatedly:
 	double time_between_beat = 60000/tempo;
 
-	setupSpeaker();
+	if (g_uiDirty) {
+    g_uiDirty = false;
+    if (g_currentBeat >= SIGS[g_sigIndex].num) g_currentBeat = 0;
+    redrawControls();
+  }
+	 if (g_running) {
+    // Tempo is quarter-note BPM. Scale by the lower number so that, if you
+    // later add e.g. x/8 signatures, an eighth-note beat is half as long.
+    unsigned long interval =
+        (60000UL * 4UL) / ((unsigned long)g_tempo * SIGS[g_sigIndex].den);
+
+    unsigned long now = millis();
+    if (now - g_lastBeat >= interval) {
+      g_lastBeat += interval;                       // keep phase locked...
+      if (now - g_lastBeat >= interval) {           // ...but resync if we
+        g_lastBeat = now;                           //    fell badly behind
+      }
+
+      int  total  = SIGS[g_sigIndex].num;
+      bool accent = (g_currentBeat == 0);
+
+      drawBeats(g_currentBeat, total);              // fast SPI update first
+      playTock(accent, g_volume / 10.0f);           // then the click
+
+      g_currentBeat = (g_currentBeat + 1) % total;
+    }
+  } else {
+    // Parked on the downbeat while paused.
+    g_currentBeat = 0;
+    g_lastBeat    = millis();
+  }
+}
+
+
 }
