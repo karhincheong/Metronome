@@ -61,8 +61,9 @@ I find my phone too distracting when attending music class, hence I'm making thi
 | `production/` | Files for manufacturers           |
 
 1. Solder the components by hand onto the PCB. You may opt for PCBA for some of the components but it's expensive.
-2. 3D Print the case of the the PCB.
-3. Install the PCB into the case by screwing the PCB down using 4 M2 screws onto the 4 holes.
+2. Flash firmware in `src/main` onto the PCB by connecting your computer to the USB-C on the PCB. You may also have to press down on BOOT and RESET for it to enter serial download mode
+3. 3D Print the case of the the PCB.
+4. Install the PCB into the case by screwing the PCB down using 4 M2 screws onto the 4 holes.
 
 ## Schematic Diagram
 
